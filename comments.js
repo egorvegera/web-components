@@ -1,23 +1,24 @@
-class VideoComments extends HTMLElement { // Изменено с Comments на VideoComments
+class VideoComments extends HTMLElement { 
     constructor() {
         super();
-        console.log('Компонент VideoComments создан');
         this.attachShadow({ mode: 'open' });
-        this.comments = [
-            { id: 1, author: "Алексей", text: "Отличное видео!" },
-            { id: 2, author: "Ольга", text: "Очень познавательно." }
-        ];
+        this.comments = [];
+        this.loadComments();
         this.render();
     }
 
     render() {
-        console.log('Рендеринг компонента');
         this.shadowRoot.innerHTML = `
             <style>
                 .comments-container {
                     max-width: 600px;
                     margin: 0 auto 20px auto;
                     font-family: Arial, sans-serif;
+                    font-size: 16px;
+                }
+                slot[name="header"] {
+                    font-size: 20px;
+                    color: #007bff;
                 }
                 .comment-list {
                     margin-bottom: 20px;
@@ -26,7 +27,7 @@ class VideoComments extends HTMLElement { // Изменено с Comments на V
                     border-bottom: 1px solid #eee;
                     padding: 10px 0;
                 }
-                .comment-author {
+                .comment-name {
                     font-weight: bold;
                     color: #333;
                 }
@@ -49,14 +50,12 @@ class VideoComments extends HTMLElement { // Изменено с Comments на V
                     padding: 8px;
                     box-sizing: border-box;
                     border: 1px solid #ddd;
-                
                 }
                 .comment-form textarea {
                     grid-column: 2 / 3;
                     min-height: 80px;
                     resize: vertical;
                 }
-            
                 .comment-form button {
                     grid-column: 2 / 3;
                     padding: 10px;
@@ -69,42 +68,75 @@ class VideoComments extends HTMLElement { // Изменено с Comments на V
                     background-color: #0056b3;
                 }
             </style>
-            <div class="comments-container">
-                <div class="comment-list">
-                    ${this.comments.map(comment => `
-                        <div class="comment">
-                            <span class="comment-author">${comment.author}</span>
-                            <p class="comment-text">${comment.text}</p>
-                        </div>
-                    `).join('')}
+            <template id="comment-template">
+                <div class="comment">
+                    <span class="comment-name"></span>
+                    <p class="comment-text"></p>
                 </div>
+            </template>
+            <div class="comments-container">
+                <slot name="header"></slot>
+                <div class="comment-list"></div>
                 <form class="comment-form">
-                    <label for="author">Имя:</label>
-                    <input type="text" id="author" placeholder="Ваше имя" required>
+                    <label for="name">Имя:</label>
+                    <input type="text" id="name" placeholder="Ваше имя" required>
                     <label for="text">Комментарий:</label>
                     <textarea id="text" placeholder="Ваш комментарий" required></textarea>
                     <button type="submit">Отправить</button>
                 </form>
             </div>
         `;
-        this.shadowRoot.querySelector('.comment-form').addEventListener('submit', this.handleSubmit.bind(this));
+
+        const template = this.shadowRoot.querySelector('#comment-template');
+        const commentList = this.comments.map(comment => {
+            const clone = template.content.cloneNode(true);
+            clone.querySelector('.comment-name').textContent = comment.name;
+            clone.querySelector('.comment-text').textContent = comment.text;
+            return clone;
+        });
+
+        const commentListContainer = this.shadowRoot.querySelector('.comment-list');
+        commentList.forEach(commentNode => commentListContainer.appendChild(commentNode));
+
+        this.shadowRoot.querySelector('.comment-form').addEventListener('submit', this.submit.bind(this));
+        this.updateCommentCount();
     }
 
-    handleSubmit(event) {
+    submit(event) {
         event.preventDefault();
-        console.log('Форма отправлена');
-        const authorInput = this.shadowRoot.querySelector('#author');
+        const nameInput = this.shadowRoot.querySelector('#name');
         const textInput = this.shadowRoot.querySelector('#text');
         const newComment = {
             id: this.comments.length + 1,
-            author: authorInput.value.trim(),
+            name: nameInput.value.trim(),
             text: textInput.value.trim()
         };
-        if (newComment.author && newComment.text) {
+        if (newComment.name && newComment.text) { 
             this.comments.push(newComment);
-            authorInput.value = '';
+            nameInput.value = '';
             textInput.value = '';
+            this.saveComments();
             this.render();
+        }
+    }
+
+    saveComments() {
+        localStorage.setItem('comments', JSON.stringify(this.comments));
+    }
+
+    loadComments() {
+        const savedComments = localStorage.getItem('comments');
+        if (savedComments) {
+            this.comments = JSON.parse(savedComments);
+        }
+    }
+
+    updateCommentCount() {
+        const slot = this.shadowRoot.querySelector('slot[name="header"]');
+        const assignedNodes = slot.assignedNodes();
+        const countSpan = assignedNodes[0].querySelector('#comment-count');
+        if (countSpan) {
+            countSpan.textContent = this.comments.length;
         }
     }
 }
